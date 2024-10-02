@@ -13,18 +13,19 @@ if not os.path.exists('clean'):
     os.makedirs('clean/Enface')
     os.makedirs('clean/OCTA')
 
-for image in os.listdir('./raw/第一部分'):
-    name, eye, type1, type2 = extract(image)
-    print(name, eye, type1, type2)
+for root, dirs, files in os.walk('./raw'):
+    for image in [f for f in files if f.endswith('.jpg')]:
+        name, eye, type1, type2 = extract(image)
+        print(name, eye, type1, type2)
 
-    son_dir = f'clean/{type1[:-1]}/{name}_{eye}'
-    if not os.path.exists(son_dir):
-        os.makedirs(son_dir)
-    shutil.copy(
-        os.path.join('raw/第一部分', image),
-        # os.path.join(son_dir, type1[:-1], f'{type2}.jpg')
-        os.path.join(son_dir, f'{type2}.jpg')
-    )
+        son_dir = f'clean/{type1[:-1]}/{name}_{eye}'
+        if not os.path.exists(son_dir):
+            os.makedirs(son_dir)
+        shutil.copy(
+            os.path.join(root, image),
+            # os.path.join(son_dir, type1[:-1], f'{type2}.jpg')
+            os.path.join(son_dir, f'{type2}.jpg')
+        )
 
 
 

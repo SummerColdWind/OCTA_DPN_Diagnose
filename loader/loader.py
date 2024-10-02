@@ -1,34 +1,37 @@
 import torch
 import torchvision
-from torch.utils.data import DataLoader, Dataset
 import cv2
 import pandas as pd
 import os
+import random
 
+from torch.utils.data import DataLoader, Dataset
+from config import config
 from utils.common import load_image
 
-root = 'data/batch_1/clean'
-layer = '视网膜血流'
+root = config['root']
+train_batch_size = config['train_batch_size']
+val_batch_size = config['val_batch_size']
+
 transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Resize((224, 224)),
     torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # ImageNet 归一化
 ])
 
-
 class OCTADataset(Dataset):
     def __init__(self):
+        super().__init__()
         self.labels = pd.read_csv(os.path.join(root, 'label.csv'), index_col=0)
-        self.images = os.listdir(os.path.join(root, 'OCTA'))
-        self.data = [
-            (transform(load_image(os.path.join(root, 'OCTA', image, f'{layer}.jpg'))),
-             torch.tensor(self.labels['label'][image], dtype=torch.long))
-            for image in self.images
-        ]
-        counts = self.labels['label'].value_counts()
-        # self.pos_weight = counts[1] / (counts[0] + counts[1])
-        # self.neg_weight = counts[0] / (counts[0] + counts[1])
-        self.pos_weight = counts[0] / counts[1]
+        self.data = []
+        for sample in self.labels.index:
+            dir_ = os.path.join(root, 'OCTA', sample)
+            files = os.listdir(dir_)
+            images = [transform(load_image(os.path.join(dir_, file))) for file in files]
+            image = torch.cat(images, dim=0)  # shape: [18, H, W]
+            label = torch.tensor(self.labels['label'][sample]).long()
+            self.data.append((image, label))
+        # random.shuffle(self.data)
 
     def __len__(self):
         return len(self.data)
@@ -37,14 +40,22 @@ class OCTADataset(Dataset):
         return self.data[item]
 
 
-def get_loader(batch_size=64):
+def get_loader():
     dataset = OCTADataset()
     length = len(dataset)
-    threshold = int(length * .8)
+    val_frac = config['val_frac']
+    threshold = int(length * val_frac)
     train_dataset, val_dataset = dataset[:threshold], dataset[threshold:]
     train_loader, val_loader = (
-        DataLoader(train_dataset, batch_size=batch_size, shuffle=True),
-        DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+        DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True),
+        DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False)
     )
-    # return train_loader, val_loader, torch.tensor([dataset.neg_weight, dataset.pos_weight], dtype=torch.float32)
-    return train_loader, val_loader, torch.tensor(dataset.pos_weight, dtype=torch.float32)
+    return train_loader, val_loader
+
+def get_class_weights():
+    """ 分类权重，用于交叉熵损失函数等 """
+    labels = pd.read_csv(os.path.join(root, 'label.csv'), index_col=0)
+    counts = labels['label'].value_counts()
+    return torch.tensor([1 / counts[0], 1 / counts[1]], dtype=torch.float)
+
+
