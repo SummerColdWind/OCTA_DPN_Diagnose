@@ -1,8 +1,8 @@
 config = {
     'device': 'cuda',  # 'cpu' or 'cuda'
     'root': 'data/batch_1/clean',
-    'val_frac': 0.2,
-    'shuffle': True,
+    'val_frac': 0.1,
+    'shuffle': False,
     'train_batch_size': 64,
     'val_batch_size': 8,
     'epoch_num': 30,
