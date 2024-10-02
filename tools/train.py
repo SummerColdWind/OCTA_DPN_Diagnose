@@ -16,7 +16,7 @@ colorama.init(autoreset=True)
 
 
 def train(model, log_name=None):
-    epoch_num, lr = config['epoch_num'], config['lr']
+    epoch_num, lr, weight_decay = config['epoch_num'], config['lr'], config['weight_decay']
 
     if log_name is None:
         log_name = str(datetime.now())[-6:]
@@ -24,6 +24,8 @@ def train(model, log_name=None):
     print(colorama.Fore.BLACK + colorama.Back.RED + colorama.Style.BRIGHT + 'tensorboard --logdir=logs')
 
     train_loader, val_loader = get_loader()
+    print(colorama.Fore.CYAN + f'Train size ~ {len(train_loader) * config["train_batch_size"]}')
+    print(colorama.Fore.CYAN + f'Valid size ~ {len(val_loader) * config["val_batch_size"]}')
 
     device = torch.device(config['device'])
     print(colorama.Fore.RED + f'Device: {device}')
@@ -34,8 +36,11 @@ def train(model, log_name=None):
     weights.to(device)
     loss_func = torch.nn.CrossEntropyLoss(weight=weights)
     loss_func.to(device)
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    opt = torch.optim.Adam(model.fc.parameters(), lr=lr, weight_decay=weight_decay)
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epoch_num)
+    scheduler = torch.optim.lr_scheduler.StepLR(opt, 5, 0.8)
 
+    best = 0.
     for epoch in range(epoch_num):
         print(colorama.Fore.GREEN + f'--- Epoch {epoch} ---', end='\t')
         model.train()
@@ -49,8 +54,10 @@ def train(model, log_name=None):
             loss.backward()
             opt.step()
             total_loss += loss.item()
-        print(colorama.Fore.BLUE + f'Loss: {total_loss / len(train_loader):.5f}', end='\t')
-        writer.add_scalar('Loss', total_loss, epoch)
+        scheduler.step()
+        print(colorama.Fore.BLUE + f'loss: {total_loss / len(train_loader):.5f}', end='\t')
+        print(colorama.Fore.MAGENTA + f'lr: {scheduler.get_last_lr()[0]:.6f}', end='\t')
+        writer.add_scalar('loss', total_loss, epoch)
 
         model.eval()
         all_probs = []
@@ -71,18 +78,22 @@ def train(model, log_name=None):
 
         # 计算准确率
         acc = acc_num / total * 100
-        print(colorama.Fore.YELLOW + f'acc: {acc:.2f}%', end='\t')
+        # print(colorama.Fore.YELLOW + f'acc: {acc:.2f}%', end='\t')
         writer.add_scalar('acc', acc, epoch)
 
         # 计算AUC
         roc_auc = roc_auc_score(all_labels, all_probs)
         print(colorama.Fore.YELLOW + f'AUC: {roc_auc:.4f}', end='\t')
         writer.add_scalar('AUC', roc_auc, epoch)
+        best = max(roc_auc, best)
+        print(colorama.Fore.RED + f'best AUC: {best:.4f}', end='\t')
+
 
         print()
 
-    if not os.path.exists(f'output/{log_name}'):
-        os.makedirs(f'output/{log_name}')
+    if config['save']:
+        if not os.path.exists(f'output/{log_name}'):
+            os.makedirs(f'output/{log_name}')
 
-    torch.save(model.state_dict(), f'output/{log_name}/last.pth')
+        torch.save(model.state_dict(), f'output/{log_name}/last.pth')
     writer.close()
