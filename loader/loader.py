@@ -36,7 +36,8 @@ class OCTADataset(Dataset):
         super().__init__()
         self.transform = transform
         self.data = data
-        # random.shuffle(self.data)
+        if config['shuffle']:
+            random.shuffle(self.data)
 
     def __len__(self):
         return len(self.data)

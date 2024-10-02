@@ -1,10 +1,11 @@
 config = {
     'device': 'cuda',  # 'cpu' or 'cuda'
     'root': 'data/batch_1/clean',
-    'val_frac': 0.9,
+    'val_frac': 0.2,
+    'shuffle': True,
     'train_batch_size': 64,
     'val_batch_size': 8,
-    'epoch_num': 200,
+    'epoch_num': 30,
     'lr': 1e-3,
     'weight_decay': 0,
     'layers': [
@@ -15,6 +16,6 @@ config = {
         # '玻璃体血流.jpg',
         # '无血管层血流.jpg',
     ],
-    'save': False,
+    'save': True,
 }
 

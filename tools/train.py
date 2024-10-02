@@ -1,5 +1,3 @@
-from torch.utils.tensorboard import SummaryWriter
-
 import os
 import torch
 import torchvision
@@ -36,7 +34,7 @@ def train(model, log_name=None):
     weights.to(device)
     loss_func = torch.nn.CrossEntropyLoss(weight=weights)
     loss_func.to(device)
-    opt = torch.optim.Adam(model.fc.parameters(), lr=lr, weight_decay=weight_decay)
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epoch_num)
     scheduler = torch.optim.lr_scheduler.StepLR(opt, 5, 0.8)
 
@@ -85,10 +83,14 @@ def train(model, log_name=None):
         roc_auc = roc_auc_score(all_labels, all_probs)
         print(colorama.Fore.YELLOW + f'AUC: {roc_auc:.4f}', end='\t')
         writer.add_scalar('AUC', roc_auc, epoch)
+
+        if config['save'] and roc_auc > best:
+            if not os.path.exists(f'output/{log_name}'):
+                os.makedirs(f'output/{log_name}')
+            torch.save(model.state_dict(), f'output/{log_name}/best.pth')
+
         best = max(roc_auc, best)
         print(colorama.Fore.RED + f'best AUC: {best:.4f}', end='\t')
-
-
         print()
 
     if config['save']:
